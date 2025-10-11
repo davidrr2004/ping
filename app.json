@@ -1,43 +1,35 @@
 {
   "expo": {
     "name": "Ping",
-    "slug": "ping-expo-app",
+    "slug": "ping",
     "version": "1.0.0",
+    "sdkVersion": "49.0.0",
+    "platforms": ["ios", "android"],
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#FF7D3B"
+      "backgroundColor": "#ffffff"
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0
     },
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Ping needs access to the microphone to detect important sounds around you.",
+        "NSSpeechRecognitionUsageDescription": "Ping optionally uses speech recognition to enhance event detection."
+      }
     },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#FF7D3B"
-      },
-      "package": "com.pingapp.pingaudiocopilot",
-      "versionCode": 1
-    },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    },
-    "sdkVersion": "49.0.0",
-    "platforms": [
-      "ios",
-      "android",
-      "web"
-    ],
-    "extra": {
-      "eas": {
-        "projectId": "4d8614d8-1991-4231-8b88-7e0d95f9c953"
-      }
+      "permissions": [
+        "RECORD_AUDIO",
+        "VIBRATE"
+      ]
     }
   }
 }

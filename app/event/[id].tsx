@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, Platform } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 // Sample event data (in a real app, you'd fetch this based on the ID)
@@ -58,9 +58,8 @@ const eventData = {
 };
 
 export default function EventDetailScreen() {
-  const route = useRoute();
-  const navigation = useNavigation();
-  const { id } = route.params;
+  const { id } = useLocalSearchParams();
+  const router = useRouter();
   const event = eventData[id];
   
   const [showTranslation, setShowTranslation] = useState(false);
@@ -103,7 +102,13 @@ export default function EventDetailScreen() {
 
   return (
     <ScrollView style={styles.container}>
-      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+      <StatusBar
+        backgroundColor="#FF7D3B"
+        barStyle="light-content"
+        translucent={true}
+      />
+      <View style={styles.safeTopPadding} />
+      <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
         <Ionicons name="arrow-back" size={24} color="#007AFF" />
         <Text style={styles.backText}>Back</Text>
       </TouchableOpacity>
@@ -168,6 +173,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F2F2F7',
+  },
+  safeTopPadding: {
+    height: Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 0,
+    backgroundColor: '#FF7D3B',
   },
   backButton: {
     flexDirection: 'row',
