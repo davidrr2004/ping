@@ -1,50 +1,59 @@
 # ping
 
-Aura is an intelligent communication platform designed to provide clarity in a world full of noise. [cite_start]It's an intelligent co-pilot for your ears, running securely on your device to ensure you never miss what matters. [cite: 32] [cite_start]Built on a privacy-first, edge-computing architecture, Aura transforms ambient sound into actionable, context-rich information delivered through a rich, multi-sensory language of sight and touch. [cite: 8, 32, 90]
+**ping** is a cross-platform mobile application built with React Native and Expo. It provides real-time audio analysis with haptic and visual feedback, helping users stay aware of their surroundings.
 
-## ✨ Core Features
+## ✨ Features
 
-* [cite_start]**Edge-First AI Intelligence**: All core AI processing happens directly on your device, ensuring near-instantaneous response times, robust offline functionality, and complete user privacy. [cite: 7, 8, 16]
-* [cite_start]**Multi-Stage Audio Pipeline**: A sophisticated pipeline that cleans audio, classifies critical alerts and speech, transcribes announcements, and analyzes the speaker's emotional tone for added context. [cite: 92, 94]
-* [cite_start]**Contextual Proactivity**: Aura learns your routines using location and time-based patterns to anticipate recurring information, like daily train announcements, and provides proactive alerts. [cite: 18, 19, 21]
-* [cite_start]**Multi-Sensory Accessibility**: Delivers information through a rich, layered notification system using visual, haptic, and AR cues. [cite: 27] [cite_start]Urgency is mapped to the intensity of the alert, from a silent log entry to a full-screen, powerful vibration pattern. [cite: 28, 162]
-* [cite_start]**On-Device Translation**: Integrated offline translation to overcome language barriers, ensuring the tool is effective anywhere in the world. [cite: 123]
-* [cite_start]**Cross-Device Synchronization**: A lightweight backend syncs alerts across all your devices, including a web dashboard, smartwatch, and AR glasses. [cite: 42]
+- **Real-time audio analysis** — Continuously monitors ambient sound and classifies audio events.
+- **Haptic feedback** — Alerts are communicated through device vibrations using `expo-haptics`.
+- **Cross-platform** — Runs on iOS, Android, and the web from a single codebase.
+- **TypeScript** — Fully typed codebase for reliability and developer confidence.
 
 ## 🚀 Tech Stack
 
-[cite_start]This project is pragmatically designed for rapid, scalable development. [cite: 35]
+| Layer | Technology |
+| :--- | :--- |
+| Framework | React Native (Expo ~49) |
+| Language | TypeScript |
+| Audio | expo-av |
+| Haptics | expo-haptics |
+| Icons | @expo/vector-icons |
 
-| Component | Recommended Tech | Justification |
-| :--- | :--- | :--- |
-| **Frontend (Mobile)** | React Native | [cite_start]Rapid cross-platform development for iOS & Android, saving immense time. [cite: 87] |
-| **Backend** | Firebase Functions / FastAPI | [cite_start]Minimal setup and high scalability with a serverless architecture. [cite: 87] |
-| **Database** | Firestore | [cite_start]Real-time capabilities and a flexible NoSQL schema ideal for rapid prototyping. [cite: 87] |
-| **AI Inference** | TensorFlow Lite | [cite_start]Excellent mobile support, highly optimized for on-device performance. [cite: 87] |
-| **Real-Time Sync** | Firebase Realtime DB / WebSockets | [cite_start]Provides a cohesive ecosystem for auth, DB, and real-time sync. [cite: 87] |
+## 🛠️ Getting Started
 
-## 🧠 The On-Device AI Pipeline
+### Prerequisites
 
-[cite_start]The technical core of Aura is a multi-stage AI pipeline that runs entirely on the user's device. [cite: 89, 90]
+- [Node.js](https://nodejs.org/) (LTS recommended)
+- [Expo CLI](https://docs.expo.dev/get-started/installation/)
+- A physical device or emulator (iOS/Android)
 
-1.  [cite_start]**Noise Suppression**: Raw audio is first cleaned by a lightweight deep learning model to isolate important sounds from background noise. [cite: 97, 98]
-2.  **Dual-Stream Classification**:
-    * [cite_start]**High-Priority Alerts**: A model like YAMNet instantly identifies critical non-speech sounds like sirens and alarms. [cite: 107, 108]
-    * [cite_start]**Speech Detection**: A Voice Activity Detection (VAD) model identifies human speech to trigger the transcription process, conserving power. [cite: 112, 114]
-3.  [cite_start]**Transcription & Translation**: A quantized Whisper model transcribes the speech, which is then fed into an offline engine for instant translation. [cite: 121, 125]
-4.  [cite_start]**Urgency Analysis**: A custom model analyzes prosodic features (pitch, energy, speech rate) to classify the emotional tone as Informational, Urgent, or Critical, adding crucial context to the text. [cite: 130, 131, 134]
+### Installation
 
-## 🛠️ Setup and Installation
-
-To get this project running locally, follow these steps.
-
-**Prerequisites:**
-* Node.js and npm/yarn
-* Expo CLI
-* Git
-* A Firebase project set up for the backend services (Authentication, Firestore, Functions).
-
-**1. Clone the Repository**
 ```bash
-git clone [https://github.com/your-username/aura-silent-communicator.git](https://github.com/your-username/aura-silent-communicator.git)
-cd aura-silent-communicator
+# 1. Clone the repository
+git clone https://github.com/davidrr2004/ping.git
+cd ping/app
+
+# 2. Install dependencies
+npm install
+
+# 3. Start the development server
+npm start
+```
+
+Scan the QR code with the **Expo Go** app on your phone, or press `a` / `i` to open an Android or iOS emulator.
+
+## 📁 Project Structure
+
+```
+ping/
+├── app/          # React Native mobile app (Expo)
+│   ├── App.tsx
+│   ├── AudioAnalysisApp.tsx
+│   └── app/      # Screen and component files
+└── web/          # Web companion interface
+```
+
+## 📄 License
+
+This project is private and not licensed for public distribution.
