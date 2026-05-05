@@ -1,6 +1,6 @@
-# Aura: AI-Powered Silent Communicator
+# Ping: AI-Powered Silent Communicator
 
-Aura is an intelligent communication platform designed to provide clarity in a world full of noise. [cite_start]It's an intelligent co-pilot for your ears, running securely on your device to ensure you never miss what matters. [cite: 32] [cite_start]Built on a privacy-first, edge-computing architecture, Aura transforms ambient sound into actionable, context-rich information delivered through a rich, multi-sensory language of sight and touch. [cite: 8, 32, 90]
+Ping is an intelligent communication platform designed to provide clarity in a world full of noise. [cite_start]It's an intelligent co-pilot for your ears, running securely on your device to ensure you never miss what matters. [cite: 32] [cite_start]Built on a privacy-first, edge-computing architecture, Aura transforms ambient sound into actionable, context-rich information delivered through a rich, multi-sensory language of sight and touch. [cite: 8, 32, 90]
 
 ## ✨ Core Features
 
