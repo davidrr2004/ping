@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,127 +8,70 @@ import {
   Alert,
   StatusBar,
   SafeAreaView,
+  Animated,
+  Easing
 } from 'react-native';
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
-// Note: MediaPipe and ML Kit imports will be installed after package.json update
+import * as Location from 'expo-location';
+import { audioCaptureService } from './services/AudioCaptureService';
+import { aiPipeline } from './services/AIPipeline';
+import { initDB, insertAlert, getAlerts, AlertEvent } from './services/DatabaseService';
+import { sendNotification, requestNotificationPermissions } from './services/NotificationService';
+import { checkPredictiveAlerts, recordEventForPattern } from './services/PredictiveAlerts';
 
 // Audio Analysis App Component
 export default function App() {
-  // Audio processing state
   const [isListening, setIsListening] = useState(false);
   const [statusText, setStatusText] = useState('Ready');
-  const [soundClassification, setSoundClassification] = useState('No sounds detected');
-  const [transcription, setTranscription] = useState('No speech detected');
-  const [urgencyAnalysis, setUrgencyAnalysis] = useState('Normal');
-  
-  // Translation state
-  const [inputText, setInputText] = useState('');
-  const [translatedText, setTranslatedText] = useState('');
-  const [translationStatus, setTranslationStatus] = useState('Ready');
-  
-  // Audio recording and processing refs
-  const recordingRef = useRef(null);
-  const audioProcessorRef = useRef(null);
-  const vadModelRef = useRef(null);
-  const yamnetModelRef = useRef(null);
-  const urgencyModelRef = useRef(null);
-  
-  // Initialize TensorFlow Lite models
+  const [currentAlert, setCurrentAlert] = useState<AlertEvent | null>(null);
+
+  // Animation values for UI alerts
+  const [fadeAnim] = useState(new Animated.Value(0));
+  const [flashAnim] = useState(new Animated.Value(0));
+
   useEffect(() => {
-    initializeModels();
-    setupAudioPermissions();
+    setupServices();
   }, []);
 
-  const setupAudioPermissions = async () => {
+  useEffect(() => {
+    // Check predictive alerts periodically
+    const interval = setInterval(() => {
+      checkPredictiveAlerts();
+    }, 60000); // every minute
+    return () => clearInterval(interval);
+  }, []);
+
+  const setupServices = async () => {
     try {
-      const { status } = await Audio.requestPermissionsAsync();
-      if (status !== 'granted') {
+      await initDB();
+      await aiPipeline.init();
+
+      const audioGranted = await audioCaptureService.requestPermissions();
+      const notifGranted = await requestNotificationPermissions();
+
+      if (!audioGranted) {
         Alert.alert('Permission Required', 'Audio recording permission is required for this app to work.');
       }
+      
+      await checkPredictiveAlerts();
     } catch (error) {
-      console.log('Permission setup error:', error);
-    }
-  };
-
-  const initializeModels = async () => {
-    try {
-      setStatusText('Loading AI models...');
-      
-      // Note: In a real implementation, you would need to bundle the .tflite model files
-      // with your app and load them from the local filesystem using MediaPipe
-      // For now, we'll simulate the model loading
-      
-      // Simulate model loading delays
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setStatusText('Models loaded successfully');
-      
-      // Initialize translation language packs
-      await initializeTranslation();
-      
-    } catch (error) {
-      console.log('Model initialization error:', error);
-      setStatusText('Failed to load models');
-      Alert.alert('Initialization Error', 'Failed to load AI models. Some features may not work.');
-    }
-  };
-
-  const initializeTranslation = async () => {
-    try {
-      // Check if language packs are available
-      // This would typically involve downloading Spanish language pack
-      setTranslationStatus('Checking language packs...');
-      
-      // Simulate language pack check/download
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      setTranslationStatus('Translation ready');
-    } catch (error) {
-      console.log('Translation initialization error:', error);
-      setTranslationStatus('Translation unavailable');
+      console.log('Service setup error:', error);
     }
   };
 
   const startListening = async () => {
     try {
       setIsListening(true);
-      setStatusText('Starting audio capture...');
+      setStatusText('Starting continuous audio capture...');
       
-      // Configure audio recording
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
-
-      const { recording } = await Audio.Recording.createAsync({
-        android: {
-          extension: '.wav',
-          outputFormat: Audio.RECORDING_OPTION_ANDROID_OUTPUT_FORMAT_DEFAULT,
-          audioEncoder: Audio.RECORDING_OPTION_ANDROID_AUDIO_ENCODER_DEFAULT,
-          sampleRate: 16000,
-          numberOfChannels: 1,
-          bitRate: 128000,
-        },
-        ios: {
-          extension: '.wav',
-          outputFormat: Audio.RECORDING_OPTION_IOS_OUTPUT_FORMAT_LINEARPCM,
-          audioQuality: Audio.RECORDING_OPTION_IOS_AUDIO_QUALITY_HIGH,
-          sampleRate: 16000,
-          numberOfChannels: 1,
-          bitRate: 128000,
-          linearPCMBitDepth: 16,
-          linearPCMIsBigEndian: false,
-          linearPCMIsFloat: false,
-        },
-      });
-
-      recordingRef.current = recording;
-      setStatusText('Listening...');
+      // Use continuous capture with double buffering
+      await audioCaptureService.startContinuousRecording(async (uri) => {
+        setStatusText('Processing chunk...');
+        await processAudioChunk(uri);
+      }, 3000); // chunk duration 3s
       
-      // Start continuous audio processing
-      startAudioProcessing();
-      
+      setStatusText('Listening (Continuous)...');
     } catch (error) {
       console.log('Start listening error:', error);
       setStatusText('Failed to start listening');
@@ -141,126 +84,67 @@ export default function App() {
       setIsListening(false);
       setStatusText('Stopping...');
       
-      if (recordingRef.current) {
-        await recordingRef.current.stopAndUnloadAsync();
-        recordingRef.current = null;
-      }
-      
-      // Stop audio processing
-      stopAudioProcessing();
+      await audioCaptureService.stopRecording();
       
       setStatusText('Ready');
-      setSoundClassification('No sounds detected');
-      setTranscription('No speech detected');
-      setUrgencyAnalysis('Normal');
-      
     } catch (error) {
       console.log('Stop listening error:', error);
       setStatusText('Error stopping');
     }
   };
 
-  const startAudioProcessing = () => {
-    // Simulate continuous audio processing
-    audioProcessorRef.current = setInterval(() => {
-      if (isListening) {
-        processAudioChunk();
-      }
-    }, 1000); // Process every second
-  };
-
-  const stopAudioProcessing = () => {
-    if (audioProcessorRef.current) {
-      clearInterval(audioProcessorRef.current);
-      audioProcessorRef.current = null;
-    }
-  };
-
-  const processAudioChunk = async () => {
+  const processAudioChunk = async (uri: string) => {
     try {
-      // Simulate VAD (Voice Activity Detection)
-      const speechDetected = Math.random() > 0.7; // 30% chance of speech
+      const alertEvent = await aiPipeline.processAudioChunk(uri);
       
-      if (speechDetected) {
-        setStatusText('Speech detected - processing...');
+      if (alertEvent) {
+        setCurrentAlert(alertEvent);
+
+        // Notify user and provide haptics based on urgency
+        await sendNotification("Detected Event", alertEvent.transcription, alertEvent.urgency);
         
-        // Simulate processing pipeline:
-        // 1. Noise suppression
-        // 2. Speech recognition (Whisper)
-        // 3. Urgency analysis
+        // Try getting location to save for pattern
+        let locString = "Unknown";
+        try {
+           let { coords } = await Location.getCurrentPositionAsync({});
+           await recordEventForPattern(alertEvent, coords);
+           locString = `${coords.latitude.toFixed(2)}, ${coords.longitude.toFixed(2)}`;
+        } catch(e) {}
         
-        await new Promise(resolve => setTimeout(resolve, 200));
+        // Save to offline DB
+        await insertAlert({...alertEvent, location: locString});
         
-        // Simulate Whisper transcription
-        const mockTranscriptions = [
-          'Hello, how are you today?',
-          'The weather is nice outside.',
-          'I need help with something.',
-          'Emergency! Call for assistance!',
-          'Thank you for your help.',
-        ];
-        const transcriptionResult = mockTranscriptions[Math.floor(Math.random() * mockTranscriptions.length)];
-        setTranscription(transcriptionResult);
-        
-        // Simulate urgency analysis
-        const urgencyLevels = ['Low', 'Normal', 'High', 'Critical'];
-        const urgencyResult = transcriptionResult.toLowerCase().includes('emergency') ? 'Critical' : 
-                             urgencyLevels[Math.floor(Math.random() * urgencyLevels.length)];
-        setUrgencyAnalysis(urgencyResult);
-        
-        setStatusText('Listening...');
+        triggerVisualAlert(alertEvent.urgency);
       }
-      
-      // Simulate YAMNet continuous sound classification
-      const mockSounds = [
-        'Background noise',
-        'Human speech',
-        'Music',
-        'Traffic sounds',
-        'Birds chirping',
-        'Door closing',
-        'Phone ringing',
-      ];
-      const soundResult = mockSounds[Math.floor(Math.random() * mockSounds.length)];
-      setSoundClassification(soundResult);
-      
     } catch (error) {
       console.log('Audio processing error:', error);
     }
   };
 
-  const handleTranslate = async () => {
-    if (!inputText.trim()) {
-      Alert.alert('Input Required', 'Please enter text to translate.');
-      return;
-    }
+  const triggerVisualAlert = (urgency: 'Informational' | 'Urgent' | 'Critical') => {
+    fadeAnim.setValue(1);
     
-    try {
-      setTranslationStatus('Translating...');
-      
-      // Simulate ML Kit translation (real implementation would use @react-native-ml-kit/translate-text)
-      // For now, provide mock translation
-      const mockTranslations = {
-        'hello': 'hola',
-        'goodbye': 'adiós',
-        'thank you': 'gracias',
-        'how are you': 'cómo estás',
-        'good morning': 'buenos días',
-        'emergency': 'emergencia',
-        'help': 'ayuda',
-      };
-      
-      const lowerInput = inputText.toLowerCase();
-      let result = mockTranslations[lowerInput] || `[Spanish translation of: ${inputText}]`;
-      
-      setTranslatedText(result);
-      setTranslationStatus('Translation complete');
-      
-    } catch (error) {
-      console.log('Translation error:', error);
-      setTranslationStatus('Translation failed');
-      Alert.alert('Translation Error', 'Failed to translate text. Please check your connection and try again.');
+    if (urgency === 'Critical') {
+      // Start flashing
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(flashAnim, { toValue: 1, duration: 200, useNativeDriver: false }),
+          Animated.timing(flashAnim, { toValue: 0, duration: 200, useNativeDriver: false })
+        ]),
+        { iterations: 10 }
+      ).start();
+    } else {
+      flashAnim.setValue(0);
     }
+
+    // Auto dismiss after a few seconds
+    setTimeout(() => {
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true
+      }).start(() => setCurrentAlert(null));
+    }, urgency === 'Critical' ? 5000 : 3000);
   };
 
   const toggleListening = () => {
@@ -271,10 +155,60 @@ export default function App() {
     }
   };
 
+  // UI Render functions
+  const renderAlertBanner = () => {
+    if (!currentAlert) return null;
+
+    let bgColor = '#2196F3'; // Info
+    let textColor = '#fff';
+
+    if (currentAlert.urgency === 'Urgent') {
+      bgColor = '#FFC107'; // Yellow
+      textColor = '#000';
+    } else if (currentAlert.urgency === 'Critical') {
+      bgColor = '#F44336'; // Red
+      textColor = '#fff';
+    }
+
+    const flashColor = flashAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [bgColor, '#000000']
+    });
+
+    const getAdditionalStyle = () => {
+      if (currentAlert.urgency === 'Critical') {
+        return styles.criticalBanner;
+      }
+      if (currentAlert.urgency === 'Informational') {
+        return styles.informationalBadge;
+      }
+      return {};
+    };
+
+    return (
+      <Animated.View style={[
+        styles.alertBanner,
+        getAdditionalStyle(),
+        {
+           opacity: fadeAnim,
+           backgroundColor: currentAlert.urgency === 'Critical' ? flashColor : bgColor
+        }
+      ]}>
+        <Text style={[styles.alertTitle, {color: textColor, textAlign: currentAlert.urgency === 'Critical' ? 'center' : 'left'}]}>
+          {currentAlert.urgency.toUpperCase()} - {currentAlert.eventType}
+        </Text>
+        <Text style={[styles.alertText, {color: textColor, textAlign: currentAlert.urgency === 'Critical' ? 'center' : 'left'}]}>{currentAlert.transcription}</Text>
+        <Text style={[styles.alertSubText, {color: textColor, textAlign: currentAlert.urgency === 'Critical' ? 'center' : 'left'}]}>{currentAlert.translation}</Text>
+      </Animated.View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar backgroundColor="#2196F3" barStyle="light-content" />
       
+      {renderAlertBanner()}
+
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Audio Analysis Tool</Text>
@@ -282,7 +216,7 @@ export default function App() {
       
       {/* Audio Processing Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Audio Processing</Text>
+        <Text style={styles.sectionTitle}>Continuous Capturing</Text>
         
         <View style={styles.statusContainer}>
           <Text style={styles.statusText}>{statusText}</Text>
@@ -295,64 +229,8 @@ export default function App() {
             color={isListening ? "#f44336" : "#4CAF50"}
           />
         </View>
-        
-        <View style={styles.outputContainer}>
-          <View style={styles.outputItem}>
-            <Text style={styles.outputLabel}>Sound Classification:</Text>
-            <Text style={styles.outputText}>{soundClassification}</Text>
-          </View>
-          
-          <View style={styles.outputItem}>
-            <Text style={styles.outputLabel}>Transcription:</Text>
-            <Text style={styles.outputText}>{transcription}</Text>
-          </View>
-          
-          <View style={styles.outputItem}>
-            <Text style={styles.outputLabel}>Urgency Analysis:</Text>
-            <Text style={[
-              styles.outputText,
-              { color: urgencyAnalysis === 'Critical' ? '#f44336' : 
-                       urgencyAnalysis === 'High' ? '#ff9800' : '#4CAF50' }
-            ]}>
-              {urgencyAnalysis}
-            </Text>
-          </View>
-        </View>
       </View>
       
-      {/* Translation Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Translation</Text>
-        
-        <View style={styles.translationContainer}>
-          <TextInput
-            style={styles.textInput}
-            placeholder="Enter text to translate to Spanish..."
-            value={inputText}
-            onChangeText={setInputText}
-            multiline
-          />
-          
-          <View style={styles.buttonContainer}>
-            <Button
-              title="Translate"
-              onPress={handleTranslate}
-              color="#2196F3"
-            />
-          </View>
-          
-          <View style={styles.translationStatus}>
-            <Text style={styles.statusText}>{translationStatus}</Text>
-          </View>
-          
-          {translatedText ? (
-            <View style={styles.translationResult}>
-              <Text style={styles.outputLabel}>Spanish Translation:</Text>
-              <Text style={styles.outputText}>{translatedText}</Text>
-            </View>
-          ) : null}
-        </View>
-      </View>
     </SafeAreaView>
   );
 }
@@ -401,49 +279,49 @@ const styles = StyleSheet.create({
   buttonContainer: {
     marginVertical: 16,
   },
-  outputContainer: {
-    marginTop: 16,
+  alertBanner: {
+    position: 'absolute',
+    top: 50,
+    left: 10,
+    right: 10,
+    padding: 15,
+    borderRadius: 8,
+    zIndex: 100,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
-  outputItem: {
-    marginBottom: 12,
-    padding: 12,
-    backgroundColor: '#f9f9f9',
-    borderRadius: 6,
-  },
-  outputLabel: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
-  },
-  outputText: {
-    fontSize: 16,
-    color: '#555',
-    lineHeight: 22,
-  },
-  translationContainer: {
-    marginTop: 8,
-  },
-  textInput: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 6,
-    padding: 12,
-    fontSize: 16,
-    minHeight: 80,
-    textAlignVertical: 'top',
-    backgroundColor: 'white',
-  },
-  translationStatus: {
+  criticalBanner: {
+    // "Full-screen" simulation
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 0,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginVertical: 8,
+    height: '100%',
   },
-  translationResult: {
-    marginTop: 16,
-    padding: 12,
-    backgroundColor: '#e3f2fd',
-    borderRadius: 6,
-    borderLeftWidth: 4,
-    borderLeftColor: '#2196F3',
+  informationalBadge: {
+    alignSelf: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    top: 50,
   },
+  alertTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  alertText: {
+    fontSize: 18,
+    marginBottom: 5,
+  },
+  alertSubText: {
+    fontSize: 16,
+    fontStyle: 'italic',
+  }
 });
